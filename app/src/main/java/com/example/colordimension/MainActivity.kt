@@ -1,21 +1,32 @@
 package com.example.colordimension
 
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -27,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.example.colordimension.ui.theme.ColorDimensionTheme
 import java.io.File
+import androidx.core.graphics.get
+import kotlin.math.sqrt
 
 fun getColorNameFromRgb(r: Int, g: Int, b: Int): String {
     return when {
@@ -68,7 +81,7 @@ fun getColorNameFromRgb(r: Int, g: Int, b: Int): String {
             var minDistance = Double.MAX_VALUE
 
             for ((name, rgb) in colorMap) {
-                val distance = Math.sqrt(
+                val distance = sqrt(
                     ((r - rgb.first) * (r - rgb.first) +
                      (g - rgb.second) * (g - rgb.second) +
                      (b - rgb.third) * (b - rgb.third)).toDouble()
@@ -119,7 +132,7 @@ class MainActivity : ComponentActivity() {
                             }
                             imageUri = FileProvider.getUriForFile(
                                 this,
-                                "$packageName.fileprovider",
+                            "$packageName.fileprovider",
                                 photoFile
                             )
                             takePictureLauncher.launch(imageUri)
@@ -143,6 +156,15 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     var hexColor by remember { mutableStateOf<String?>(null) }
+    var bitmap by remember(imageUri) { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    LaunchedEffect(imageUri) {
+        imageUri?.let { uri ->
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                bitmap = BitmapFactory.decodeStream(stream)
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -165,11 +187,6 @@ fun HomeScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
         imageUri?.let {
-            val bitmap = remember(it) {
-                context.contentResolver.openInputStream(it)?.use { stream ->
-                    BitmapFactory.decodeStream(stream)
-                }
-            }
             bitmap?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
@@ -182,7 +199,7 @@ fun HomeScreen(
                                 val x = (offset.x * bmp.width / this.size.width).toInt()
                                 val y = (offset.y * bmp.height / this.size.height).toInt()
                                 if (x in 0 until bmp.width && y in 0 until bmp.height) {
-                                    val pixel = bmp.getPixel(x, y)
+                                    val pixel = bmp[x, y]
                                     val r = (pixel shr 16) and 0xFF
                                     val g = (pixel shr 8) and 0xFF
                                     val b = pixel and 0xFF
