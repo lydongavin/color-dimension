@@ -268,10 +268,24 @@ fun HomeScreen(
 
   LaunchedEffect(imageUri) {
     imageUri?.let { uri ->
+      // Data Extraction: Load the image from the URI
       context.contentResolver.openInputStream(uri)?.use { stream ->
-        val loadedBitmap = BitmapFactory.decodeStream(stream)
-        bitmap = loadedBitmap
-        loadedBitmap?.let(onBitmapLoaded)
+        val originalBitmap = BitmapFactory.decodeStream(stream)
+        if (originalBitmap != null) {
+          // Preprocessing: Crop the image to a square and compress it losslessly
+          val size = minOf(originalBitmap.width, originalBitmap.height)
+          val xOffset = (originalBitmap.width - size) / 2
+          val yOffset = (originalBitmap.height - size) / 2
+          val squareBitmap = android.graphics.Bitmap.createBitmap(originalBitmap, xOffset, yOffset, size, size)
+
+          // Compress to PNG (lossless) and then decode back to a Bitmap
+          val byteStream = java.io.ByteArrayOutputStream()
+          squareBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, byteStream)
+          val compressedBitmap = BitmapFactory.decodeByteArray(byteStream.toByteArray(), 0, byteStream.size())
+
+          bitmap = compressedBitmap
+          compressedBitmap?.let(onBitmapLoaded)
+        }
       }
     }
   }
@@ -303,6 +317,10 @@ fun HomeScreen(
       Text(if (isProcessing) "Processing..." else "Ask About a Color")
     }
     Spacer(modifier = Modifier.height(16.dp))
+    tappedColor?.let {
+
+      Text(text = "Tapped Color: $it", style = MaterialTheme.typography.bodyLarge)
+    }
     imageUri?.let {
       bitmap?.let { bmp ->
         Image(
@@ -313,6 +331,7 @@ fun HomeScreen(
             .aspectRatio(bmp.width.toFloat() / bmp.height)
             .pointerInput(Unit) {
               detectTapGestures { offset: Offset ->
+                // Feature Extraction: Calculate pixel coordinates and extract RGB values from the tapped pixel
                 val x = (offset.x * bmp.width / this.size.width).toInt()
                 val y = (offset.y * bmp.height / this.size.height).toInt()
                 if (x in 0 until bmp.width && y in 0 until bmp.height) {
@@ -320,6 +339,7 @@ fun HomeScreen(
                   val r = (pixel shr 16) and 0xFF
                   val g = (pixel shr 8) and 0xFF
                   val b = pixel and 0xFF
+                  // Classification: Determine the color name from the RGB values
                   tappedColor = getColorNameFromRgb(r, g, b)
                   onColorTapped(tappedColor ?: "")
                 }
@@ -328,10 +348,7 @@ fun HomeScreen(
         )
       }
     }
-    tappedColor?.let {
-      Spacer(modifier = Modifier.height(16.dp))
-      Text(text = "Tapped Color: $it", style = MaterialTheme.typography.bodyLarge)
-    }
+    Spacer(modifier = Modifier.height(16.dp))
     if (isProcessing) {
       Spacer(modifier = Modifier.height(8.dp))
       Text("Scanning image for color...", style = MaterialTheme.typography.bodyMedium)
